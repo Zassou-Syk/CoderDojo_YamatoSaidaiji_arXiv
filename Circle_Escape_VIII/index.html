@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<!-- HTML5文書であることをブラウザに宣言する -->
+<html lang="ja">
+<!-- ページ全体の言語を日本語に設定する -->
+<head>
+    <!-- ブラウザが読み込む設定情報をここにまとめる -->
+    <meta charset="UTF-8">
+    <!-- 文字コードをUTF-8に設定して日本語が正しく表示されるようにする -->
+    <title>CIRCLE ESCAPE - SHOP SYSTEM</title>
+    <!-- ブラウザのタブに表示されるタイトル。今作からショップ機能が追加された -->
+    <style>
+        /* ===== 全体レイアウト ===== */
+        body {
+            /* ページ全体の基本スタイルを設定する */
+            margin: 0; padding: 0;
+            /* 余白をすべてゼロにして画面の端まで使えるようにする */
+            background-color: #1a1a1a; color: #ffffff;
+            /* 背景を暗いグレー、文字を白にする */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* フォントを指定。左から優先順位順で、なければ次のフォントを使う */
+            display: flex; align-items: center; justify-content: center;
+            /* flexboxで全体を画面の縦横中央に配置する */
+            height: 100vh; overflow: hidden; user-select: none;
+            /* 高さを画面いっぱいに、はみ出しを隠し、テキスト選択を禁止する */
+        }
+        #main-layout { display: flex; align-items: flex-start; gap: 30px; position: relative; }
+        /* ゲーム画面とサイドパネルを横並びにし、間に30pxの隙間を空ける。position:relativeはショップ画面の基準点になる */
+        #game-container { position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        /* キャンバスとUIを重ねるための箱。影で浮き上がって見えるようにする */
+        canvas { background-color: #111; border-radius: 50%; border: 4px solid #444; display: block; }
+        /* キャンバスをほぼ黒背景・円形・グレー枠線で表示する */
+
+        /* ===== サイドパネル ===== */
+        #side-panel {
+            /* 右側のステータス表示パネルのスタイル */
+            width: 180px; background: rgba(40, 40, 40, 0.8); padding: 20px;
+            /* 幅180px、半透明の暗いグレー背景、内側余白20px */
+            border-radius: 10px; border-left: 4px solid #00d4ff;
+            /* 角を丸くし、左端にシアン色のアクセントラインをつける */
+            display: flex; flex-direction: column; gap: 10px;
+            /* 子要素を縦に積み重ねて10pxの隙間を空ける */
+        }
+        .stat-box { margin-bottom: 5px; }
+        /* 各ステータスボックスの下に少し余白をつける */
+        .label { font-size: 11px; color: #aaa; text-transform: uppercase; }
+        /* ラベル文字を小さめのグレー・大文字表示にする */
+        .value { font-size: 20px; font-weight: bold; color: #00d4ff; font-family: 'Courier New', monospace; }
+        /* 数値表示を大きくシアン色の等幅フォントにする */
+        .hp-value { color: #00ff88; }
+        /* HP表示だけ緑色にする（上の.valueの色を上書き） */
+        .kill-value { color: #ffea00; }
+        /* キル数（＝お金）表示は黄色にする。前作のcount-redから変更された */
+
+        /* ===== UIレイヤー ===== */
+        #ui-layer {
+            /* スタート・ショップ・ゲームオーバー画面をキャンバスに重ねる透明レイヤー */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            /* キャンバスの左上を起点にキャンバス全体を覆う */
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            /* 中身を縦横中央に配置する */
+            pointer-events: none; z-index: 10;
+            /* このレイヤー自体はクリックを透過させる。z-index:10でキャンバスより前面に表示する */
+        }
+        .menu-card {
+            /* スタート画面・ゲームオーバー画面のカード型ウィンドウのスタイル */
+            background: rgba(0, 0, 0, 0.95); padding: 25px; border-radius: 15px;
+            /* ほぼ不透明の黒背景、内側余白25px、角丸15px */
+            text-align: center; pointer-events: auto; border: 2px solid #00d4ff; width: 320px;
+            /* テキスト中央揃え、クリックを受け付けるようにし、シアンの枠線と幅を設定 */
+        }
+        h1 { margin: 0 0 10px 0; color: #00d4ff; font-size: 22px; }
+        /* 見出しの余白・シアン色・文字サイズを設定する */
+        button {
+            /* すべてのボタン共通のスタイル */
+            background: #00d4ff; border: none; padding: 12px 30px; font-size: 18px;
+            /* シアン背景、枠線なし、内側余白、大きめ文字 */
+            font-weight: bold; color: #111; cursor: pointer; border-radius: 5px; margin-top: 10px;
+            /* 太字、濃い文字色、ポインターカーソル、角丸、上余白10px */
+        }
+
+        /* ===== ショップ画面専用 ===== */
+        #shop-screen {
+            /* ショップ画面全体のスタイル。ui-layer内にabsoluteで重ねて全面に表示する */
+            background: rgba(10, 20, 30, 0.98); width: 100%; height: 100%;
+            /* ほぼ不透明の深い青黒背景でui-layerを全面覆う */
+            position: absolute; top: 0; left: 0; pointer-events: auto;
+            /* ui-layerの左上を起点に全面に配置し、クリックを受け付けるようにする */
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            /* 中の要素を縦に積み重ねて中央揃えにする */
+        }
+        .shop-items { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        /* ショップアイテムを2列のグリッドで並べて15pxの隙間を空ける */
+        .shop-item {
+            /* 各強化アイテムのカードのスタイル */
+            background: #222; border: 1px solid #444; padding: 10px; border-radius: 8px;
+            /* 暗いグレー背景、細いグレー枠線、内側余白10px、角丸8px */
+            cursor: pointer; transition: 0.2s;
+            /* マウスカーソルをポインターにし、ホバー時のアニメーションを0.2秒かけて行う */
+        }
+        .shop-item:hover { border-color: #00d4ff; background: #2a2a2a; }
+        /* アイテムにマウスを乗せたとき枠線をシアンにして少し明るくする */
+        .shop-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        /* 購入不可のアイテムを半透明にして禁止カーソルを表示する */
+        .item-name { font-weight: bold; font-size: 14px; color: #00fbff; }
+        /* アイテム名を太字シアンで表示する */
+        .item-cost { font-size: 12px; color: #ffea00; }
+        /* コスト表示を小さめの黄色にする */
+
+        /* ===== GOボタン（ショップ終了）===== */
+        #go-button {
+            /* ショップ画面右下に固定されるGOボタン専用のスタイル */
+            position: absolute; bottom: 30px; left: 30px;
+            /* ショップ画面(position:absolute)を基準に左下から30pxの位置に置く */
+            width: 80px; height: 80px; border-radius: 50%;
+            /* 80×80pxの正円ボタンにする */
+            background: #ffea00; color: #000; font-size: 24px;
+            /* 黄色背景・黒文字・大きめ文字にして目立たせる */
+            border: 4px solid #fff; box-shadow: 0 0 20px rgba(255,234,0,0.5);
+            /* 白い太枠線と黄色いグロー効果をつける */
+        }
+
+        .hidden { display: none !important; }
+        /* このクラスをつけた要素を完全に非表示にする（!importantで最優先） */
+    </style>
+</head>
+<body>
+<!-- ページに実際に表示されるコンテンツをここに書く -->
+
+    <div id="main-layout">
+        <!-- ゲーム画面とサイドパネルを横に並べる外枠 -->
+        <div id="game-container">
+            <!-- キャンバスと各種画面を重ねるための箱 -->
+            <canvas id="gameCanvas"></canvas>
+            <!-- JavaScriptでゲームを描画するキャンバス本体 -->
+            
+            <div id="ui-layer">
+                <!-- スタート・ショップ・ゲームオーバー画面を重ねるための透明レイヤー -->
+
+                <!-- スタート画面 -->
+                <div id="start-screen" class="menu-card">
+                    <!-- ゲーム開始前に表示されるスタート画面（最初から表示） -->
+                    <h1>CIRCLE ESCAPE</h1>
+                    <!-- ゲームタイトル -->
+                    <p>40秒生存してショップで機体を強化せよ！</p>
+                    <!-- ゲームの目標説明。40秒生存するとショップが開く -->
+                    <button onclick="startGame()">START MISSION</button>
+                    <!-- クリックするとJavaScriptのstartGame()関数を呼び出すボタン -->
+                </div>
+
+                <!-- ショップ画面 -->
+                <div id="shop-screen" class="hidden">
+                    <!-- 40秒生存時に表示されるショップ画面（最初はhiddenで非表示） -->
+                    <h1 style="color:#ffea00">UPGRADE SHOP</h1>
+                    <!-- ショップの見出し。黄色で他の画面と区別する -->
+                    <p>獲得ポイント（撃破数）で強化アイテムを選択してください</p>
+                    <!-- ショップの説明文。kills数がそのままお金になる -->
+                    <div class="shop-items">
+                        <!-- 2列グリッドで強化アイテムを並べるコンテナ -->
+                        <div class="shop-item" onclick="buyItem('swordLen')">
+                            <!-- クリックでbuyItem('swordLen')を呼ぶ。引数で購入するアイテムの種類を渡す -->
+                            <div class="item-name">LONG BLADE</div>
+                            <!-- アイテム名 -->
+                            <div class="item-cost">Cost: 5 Kills</div>
+                            <!-- 購入に必要なキル数 -->
+                            <div style="font-size:10px">剣の長さを+10%</div>
+                            <!-- アイテムの効果説明 -->
+                        </div>
+                        <div class="shop-item" onclick="buyItem('swordSpeed')">
+                            <!-- 剣の回転速度を上げるアイテム -->
+                            <div class="item-name">SUPER SPIN</div>
+                            <div class="item-cost">Cost: 5 Kills</div>
+                            <div style="font-size:10px">回転速度を+15%</div>
+                        </div>
+                        <div class="shop-item" onclick="buyItem('repair')">
+                            <!-- HPを回復するアイテム -->
+                            <div class="item-name">REPAIR</div>
+                            <div class="item-cost">Cost: 3 Kills</div>
+                            <div style="font-size:10px">HPを5回復</div>
+                        </div>
+                        <div class="shop-item" onclick="buyItem('speed')">
+                            <!-- 移動速度を上げるアイテム -->
+                            <div class="item-name">BOOSTER</div>
+                            <div class="item-cost">Cost: 8 Kills</div>
+                            <div style="font-size:10px">移動速度を+10%</div>
+                        </div>
+                    </div>
+                    <button id="go-button" onclick="closeShop()">GO</button>
+                    <!-- ショップを閉じてゲームに戻るGOボタン。closeShop()を呼ぶ -->
+                </div>
+
+                <!-- ゲームオーバー画面 -->
+                <div id="gameover-screen" class="menu-card hidden">
+                    <!-- HPが0になったときに表示される画面（最初はhiddenで非表示） -->
+                    <h1>MISSION FAILED</h1>
+                    <!-- ゲームオーバーの見出し -->
+                    <p id="final-score"></p>
+                    <!-- 生存時間とキル数をJavaScriptで動的に書き込む -->
+                    <button onclick="location.reload()">RELOAD</button>
+                    <!-- ページをリロードしてゲームを最初からやり直すボタン -->
+                </div>
+            </div>
+        </div>
+
+        <!-- サイドパネル -->
+        <div id="side-panel">
+            <!-- 右側のリアルタイムステータス表示パネル -->
+            <div class="stat-box">
+                <!-- HP表示ブロック -->
+                <div class="label">Armor (HP)</div>
+                <!-- ラベル文字 -->
+                <div id="hp-val" class="value hp-value">12.0</div>
+                <!-- 現在HPをJavaScriptで更新する。初期値12.0 -->
+            </div>
+            <div class="stat-box">
+                <!-- キル数（ショップのお金）表示ブロック。前作の「敵の数」から変更された -->
+                <div class="label">Kills (Money)</div>
+                <!-- ラベル文字。カッコ内でショップのお金でもあることを示す -->
+                <div id="kill-val" class="value kill-value">0</div>
+                <!-- 撃破数をJavaScriptで更新する。初期値0 -->
+            </div>
+            <div class="stat-box">
+                <!-- 生存時間表示ブロック -->
+                <div class="label">Time Survived</div>
+                <div id="timer-val" class="value">0.00s</div>
+                <!-- 経過時間をJavaScriptで更新する。初期値0.00s -->
+            </div>
+            <div class="stat-box">
+                <!-- 累計出現敵数表示ブロック -->
+                <div class="label">Total Spawned</div>
+                <div id="spawn-val" class="value">0</div>
+                <!-- 今までに出現した敵の総数をJavaScriptで更新する -->
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ===== DOM要素の取得 =====
+    // HTMLの要素をJavaScriptで操作できるよう変数に代入する
+
+    const canvas = document.getElementById('gameCanvas');
+    // id="gameCanvas"のcanvas要素を取得する
+    const ctx = canvas.getContext('2d');
+    // canvasの2D描画コンテキストを取得。これを使って図形を描く
+    const hpVal = document.getElementById('hp-val');
+    // HP表示用のdiv要素を取得する
+    const killVal = document.getElementById('kill-val');
+    // キル数表示用のdiv要素を取得する（前作のenemyValに相当）
+    const timerVal = document.getElementById('timer-val');
+    // タイマー表示用のdiv要素を取得する
+    const spawnVal = document.getElementById('spawn-val');
+    // 累計出現数表示用のdiv要素を取得する
+    
+    const startScreen = document.getElementById('start-screen');
+    // スタート画面のdiv要素を取得する
+    const shopScreen = document.getElementById('shop-screen');
+    // ショップ画面のdiv要素を取得する（今作で新追加）
+    const gameoverScreen = document.getElementById('gameover-screen');
+    // ゲームオーバー画面のdiv要素を取得する
+
+    const ARENA_RADIUS = 250;
+    // アリーナ（円形フィールド）の半径をピクセル単位で定義する
+    canvas.width = ARENA_RADIUS * 2;
+    // キャンバスの幅を直径（250×2=500px）に設定する
+    canvas.height = ARENA_RADIUS * 2;
+    // キャンバスの高さも500pxに設定する
+
+    let gameState = 'START';
+    // ゲームの状態を管理する変数。'START'/'PLAYING'/'SHOP'/'GAMEOVER'の4つになった（前作より1種類増加）
+    let startTime, elapsedTime = 0, totalSpawned = 0, kills = 0;
+    // startTime: 開始時刻 / elapsedTime: 経過秒数 / totalSpawned: 総出現数 / kills: 撃破数（今作で追加）
+    let animationId, lastRedMissileTime = 0;
+    // animationId: ループを止めるためのID / lastRedMissileTime: 最後にミサイルを撃った時刻
+    let shopOpenedFor40s = false;
+    // 40秒時点のショップを一度だけ開くためのフラグ。trueになると再度開かない
+
+    // プレイヤー初期設定
+    const player = {
+        // プレイヤーの全データをオブジェクトとしてまとめる
+        x: ARENA_RADIUS, y: ARENA_RADIUS,
+        // 初期位置をアリーナ中心（250, 250）に設定する
+        radius: 10, color: '#00d4ff',
+        // 当たり判定半径10px、表示色シアン（※バグ修正で追加した行）
+        speed: 4.86, // 4.5 * 1.08
+        // 移動速度。前作4.5から8%増に強化されている
+        hp: 12, maxHp: 12,
+        // 現在HP12、最大HP12
+        swordAngle: 0, 
+        // 剣の現在の回転角度（ラジアン）。毎フレーム増加して回転する
+        swordLen: 59, 
+        // 剣の長さ（px）。ショップのLONG BLADEで増加できる
+        swordWidth: 7,
+        // 剣の幅（px）
+        swordRotSpeed: 0.056 // 0.05 * 1.12
+        // 剣の回転速度。前作0.05から12%増に強化されている。ショップのSUPER SPINで増加できる
+    };
+
+    let enemies = [];
+    // 現在フィールドにいる敵をすべて格納する配列（最初は空）
+    let missiles = [];
+    // 現在飛んでいるミサイルをすべて格納する配列（最初は空）
+    const keys = {};
+    // 現在押されているキーを記録するオブジェクト。例: keys['ArrowUp'] = true
+
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    // キーを押したとき、そのキーコードをtrueで記録する
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    // キーを離したとき、そのキーコードをfalseに戻す
+
+    // ===== 敵を出現させる関数 =====
+    function spawnEnemy() {
+        totalSpawned++;
+        // 出現するたびに総出現数を1増やす
+        const isElite = (totalSpawned % 10 === 0);
+        // 10体ごと（10, 20, 30...体目）にエリート敵を出現させる
+        const angle = Math.random() * Math.PI * 2;
+        // 0〜2πのランダムな角度（円周上のどこかを示す方向）を選ぶ
+        const dist = ARENA_RADIUS - 30;
+        // 出現位置をアリーナ端より少し内側（220px）にする
+        const enemy = {
+            // 敵オブジェクトを作成する
+            x: ARENA_RADIUS + Math.cos(angle) * dist,
+            // 中心からangle方向にdist進んだX座標に出現する
+            y: ARENA_RADIUS + Math.sin(angle) * dist,
+            // 中心からangle方向にdist進んだY座標に出現する
+            type: isElite ? 'elite' : 'normal',
+            // エリートかどうかでtypeを切り替える
+            radius: isElite ? 15 : (8 + Math.random() * 10),
+            // エリートは半径15固定、通常は8〜18のランダムなサイズにする
+            color: isElite ? '#ffea00' : '#ff4d4d',
+            // エリートは黄色、通常は赤色にする
+            lastShot: 0,
+            // 最後にミサイルを撃った時刻（0はまだ一度も撃っていない）
+            shotInterval: 2000 + Math.random() * 1000,
+            // 射撃間隔を2000〜3000ミリ秒のランダムな値にする
+            hp: 0, maxHp: 0
+            // HPは後の行で正式に設定する（ここでは仮に0で初期化）
+        };
+        const speedMult = isElite ? 0.3 : 3.5;
+        // エリートはゆっくり（0.3）、通常は速く（3.5）動かす
+        enemy.vx = (Math.random() - 0.5) * speedMult;
+        // X方向の速度をランダムに設定。-0.5〜0.5にspeedMultを掛ける
+        enemy.vy = (Math.random() - 0.5) * speedMult;
+        // Y方向の速度をランダムに設定する
+        enemy.maxHp = isElite ? 50 : (enemy.radius * 2);
+        // エリートのHPは50固定、通常は半径×2（大きいほど体力がある）
+        enemy.hp = enemy.maxHp;
+        // 現在HPを最大HPで初期化する
+        enemies.push(enemy);
+        // 作成した敵をenemies配列の末尾に追加する
+    }
+
+    // ===== 敵がミサイルを発射する関数 =====
+    function shootMissile(from, color = '#ffffff') {
+        // from: ミサイルを撃つ敵オブジェクト / color: ミサイルの色（デフォルトは白）
+        const angle = Math.atan2(player.y - from.y, player.x - from.x);
+        // 敵からプレイヤーへの方向を角度（ラジアン）で計算する
+        missiles.push({
+            // ミサイルオブジェクトを作成してmissiles配列に追加する
+            x: from.x, y: from.y,
+            // ミサイルの初期位置は敵の現在地と同じ
+            vx: Math.cos(angle) * 2.5, vy: Math.sin(angle) * 2.5,
+            // 計算した角度方向に速度2.5で飛ぶよう設定する
+            radius: 4, color: color
+            // ミサイルの当たり判定半径4px、色は引数で渡された色
+        });
+    }
+
+    // ===== ゲームの初期化処理 =====
+    function initGame() {
+        player.x = ARENA_RADIUS; player.y = ARENA_RADIUS;
+        // プレイヤーをアリーナ中心に戻す
+        player.hp = 12; kills = 0;
+        // プレイヤーHPを最大値に、キル数を0にリセットする
+        enemies = []; missiles = [];
+        // 敵とミサイルの配列をすべてクリアする
+        elapsedTime = 0; startTime = Date.now();
+        // 経過時間を0にし、現在時刻をスタート時刻として記録する
+        totalSpawned = 0; shopOpenedFor40s = false;
+        // 総出現数を0に、40秒ショップフラグをfalseにリセットする
+        for(let i=0; i<5; i++) spawnEnemy();
+        // 最初に5体の敵を一気に出現させる（iを0〜4と変えながら5回繰り返す）
+    }
+
+    // ===== ゲームを開始する関数（STARTボタンから呼ばれる）=====
+    function startGame() {
+        gameState = 'PLAYING';
+        // ゲーム状態をPLAYINGに切り替える
+        startScreen.classList.add('hidden');
+        // スタート画面にhiddenクラスを付けて非表示にする
+        initGame();
+        // 全データを初期化する
+        gameLoop();
+        // ゲームループを開始する
+    }
+
+    // ===== ショップを開く関数（40秒経過時に呼ばれる）=====
+    function openShop() {
+        gameState = 'SHOP';
+        // ゲーム状態をSHOPに切り替える（ゲームループはこの状態では動かない）
+        shopScreen.classList.remove('hidden');
+        // ショップ画面からhiddenクラスを外して表示する
+    }
+
+    // ===== ショップを閉じてゲームに戻る関数（GOボタンから呼ばれる）=====
+    function closeShop() {
+        gameState = 'PLAYING';
+        // ゲーム状態をPLAYINGに戻す
+        shopScreen.classList.add('hidden');
+        // ショップ画面にhiddenクラスを付けて非表示にする
+        // タイマーを調整（ショップにいた時間を引く）
+        startTime = Date.now() - (elapsedTime * 1000);
+        // ショップ滞在時間をタイマーから除外する。
+        // 「現在時刻 - ショップ開店時の経過ミリ秒」を新たなstartTimeにすることで
+        // ゲームに戻っても経過時間が飛び跳ねずに40秒から続きになる
+        gameLoop();
+        // ゲームループを再開する
+    }
+
+    // ===== ショップでアイテムを購入する関数 =====
+    function buyItem(type) {
+        // type: 購入するアイテムの種類を示す文字列
+        if (type === 'swordLen' && kills >= 5) { player.swordLen *= 1.1; kills -= 5; }
+        // LONG BLADE: kills5以上あれば剣の長さを10%増やしkillsを5消費する
+        if (type === 'swordSpeed' && kills >= 5) { player.swordRotSpeed *= 1.15; kills -= 5; }
+        // SUPER SPIN: kills5以上あれば剣の回転速度を15%増やしkillsを5消費する
+        if (type === 'repair' && kills >= 3) { player.hp = Math.min(player.maxHp, player.hp + 5); kills -= 3; }
+        // REPAIR: kills3以上あればHPを5回復（maxHpを超えないようにMath.minで上限設定）しkillsを3消費する
+        if (type === 'speed' && kills >= 8) { player.speed *= 1.1; kills -= 8; }
+        // BOOSTER: kills8以上あれば移動速度を10%増やしkillsを8消費する
+        killVal.innerText = kills;
+        // 購入後にサイドパネルのキル数表示をリアルタイムで更新する
+    }
+
+    // ===== ゲームオーバー処理 =====
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        // ゲーム状態をGAMEOVERに切り替える
+        cancelAnimationFrame(animationId);
+        // requestAnimationFrameで繰り返されているゲームループを止める
+        gameoverScreen.classList.remove('hidden');
+        // ゲームオーバー画面を表示する
+        document.getElementById('final-score').innerText = `Survived: ${elapsedTime.toFixed(2)}s | Kills: ${kills}`;
+        // 生存時間とキル数をゲームオーバー画面に書き込む（テンプレートリテラルで文字列を組み立てる）
+    }
+
+    // ===== 毎フレーム呼ばれるゲームロジック更新関数 =====
+    function update() {
+        if (gameState !== 'PLAYING') return;
+        // PLAYINGでなければ何もせず即終了する（SHOP中はここで止まるのでゲームが一時停止する）
+
+        elapsedTime = (Date.now() - startTime) / 1000;
+        // 現在時刻からスタート時刻を引いてミリ秒→秒に変換し経過時間を更新する
+        timerVal.innerText = elapsedTime.toFixed(2) + 's';
+        // タイマー表示を小数点2桁に整えて画面に反映する
+        killVal.innerText = kills;
+        // キル数を画面に反映する
+        spawnVal.innerText = totalSpawned;
+        // 総出現数を画面に反映する
+        hpVal.innerText = Math.max(0, player.hp).toFixed(1);
+        // HPを小数点1桁で表示。0以下は0として表示する
+
+        // 40秒でショップへ
+        if (elapsedTime >= 40 && !shopOpenedFor40s) {
+            // 経過時間が40秒以上かつまだショップを開いていない場合
+            shopOpenedFor40s = true;
+            // フラグをtrueにして二度とここに入らないようにする
+            openShop();
+            // ショップを開く
+            return;
+            // update()をここで終了する（ゲームループはSHOP状態になり停止する）
+        }
+
+        player.swordAngle += player.swordRotSpeed;
+        // 毎フレーム剣の角度をswordRotSpeed分増やして回転させる（ショップで強化可能）
+
+        if (enemies.length < 11 && enemies.length < 5 + Math.floor(elapsedTime / 8)) spawnEnemy();
+        // 敵が11体未満かつ時間に応じた上限より少なければ新たに1体追加する
+        // （8秒ごとに上限が1体増え、時間が経つほど敵が増えていく）
+
+        if (enemies.length >= 10 && Date.now() - lastRedMissileTime > 1200) {
+            // 敵が10体以上いて前回の一斉射撃から1.2秒以上経っていたら
+            const redEnemies = enemies.filter(e => e.type === 'normal');
+            // 通常（赤）の敵だけをfilterで絞り込む
+            if (redEnemies.length > 0) shootMissile(redEnemies[Math.floor(Math.random() * redEnemies.length)]);
+            // 赤い敵の中からランダムに1体選んでミサイルを発射させる
+            lastRedMissileTime = Date.now();
+            // 最終発射時刻を現在時刻に更新する
+        }
+
+        // 移動
+        let dx = 0, dy = 0;
+        // このフレームでのX・Y方向の移動量を初期化する
+        if (keys['ArrowUp'] || keys['KeyW']) dy -= player.speed;
+        // 上矢印またはWキーが押されていれば上方向に移動（Y座標を減らす）
+        if (keys['ArrowDown'] || keys['KeyS']) dy += player.speed;
+        // 下矢印またはSキーが押されていれば下方向に移動（Y座標を増やす）
+        if (keys['ArrowLeft'] || keys['KeyA']) dx -= player.speed;
+        // 左矢印またはAキーが押されていれば左方向に移動（X座標を減らす）
+        if (keys['ArrowRight'] || keys['KeyD']) dx += player.speed;
+        // 右矢印またはDキーが押されていれば右方向に移動（X座標を増やす）
+        player.x += dx; player.y += dy;
+        // 計算した移動量をプレイヤーの座標に加算する
+
+        const pDist = Math.hypot(player.x - ARENA_RADIUS, player.y - ARENA_RADIUS);
+        // プレイヤーとアリーナ中心の直線距離を計算する（Math.hypotは三平方の定理）
+        if (pDist + player.radius > ARENA_RADIUS) {
+            // プレイヤーがアリーナの外に出ようとしていたら
+            const angle = Math.atan2(player.y - ARENA_RADIUS, player.x - ARENA_RADIUS);
+            // 中心からプレイヤーへの方向を角度で求める
+            player.x = ARENA_RADIUS + Math.cos(angle) * (ARENA_RADIUS - player.radius);
+            // X座標をアリーナの縁ぎりぎりの内側に補正する
+            player.y = ARENA_RADIUS + Math.sin(angle) * (ARENA_RADIUS - player.radius);
+            // Y座標も同様に補正する
+        }
+
+        const swX = player.x + Math.cos(player.swordAngle) * (player.swordLen * 0.8);
+        // 剣の先端のX座標を計算する（プレイヤー位置から剣の方向に長さの80%進んだ点）
+        const swY = player.y + Math.sin(player.swordAngle) * (player.swordLen * 0.8);
+        // 剣の先端のY座標を計算する
+
+        // 敵
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            // 配列を後ろから処理する（削除してもインデックスがずれないため逆順にする）
+            const e = enemies[i];
+            // iの敵を変数eに代入して扱いやすくする
+            e.x += e.vx; e.y += e.vy;
+            // 毎フレーム速度（vx, vy）分だけ敵を移動させる
+            if (e.type === 'elite' && Date.now() - e.lastShot > e.shotInterval) {
+                // エリート敵で前回の射撃からshotInterval以上経っていたら
+                shootMissile(e, '#ffea00');
+                // 黄色いミサイルを発射させる
+                e.lastShot = Date.now();
+                // 最終射撃時刻を更新する
+            }
+            const dist = Math.hypot(e.x - ARENA_RADIUS, e.y - ARENA_RADIUS);
+            // 敵とアリーナ中心の距離を計算する
+            if (dist + e.radius > ARENA_RADIUS) {
+                // 敵がアリーナ外に出ようとしていたら
+                const nx = (e.x - ARENA_RADIUS) / dist, ny = (e.y - ARENA_RADIUS) / dist;
+                // 中心から敵への方向を表す単位ベクトル（長さ1）を求める
+                const dot = e.vx * nx + e.vy * ny;
+                // 速度ベクトルと法線ベクトルの内積を計算する（反射の計算に使う）
+                e.vx -= 2 * dot * nx; e.vy -= 2 * dot * ny;
+                // 内積を使った反射公式で速度を反転させ、壁で跳ね返る動きを実現する
+                e.x = ARENA_RADIUS + nx * (ARENA_RADIUS - e.radius);
+                // 敵のX座標をアリーナ内側に補正する
+                e.y = ARENA_RADIUS + ny * (ARENA_RADIUS - e.radius);
+                // 敵のY座標もアリーナ内側に補正する
+            }
+            if (Math.hypot(e.x - swX, e.y - swY) < e.radius + 25) {
+                // 敵と剣の先端の距離が「敵の半径+25」未満なら剣が当たっている（前作より+5拡大）
+                e.hp -= e.type === 'elite' ? 0.35 : (0.7 * (15 / e.radius));
+                // エリートへのダメージは0.35固定。通常敵は小さいほど大きなダメージを受ける
+            }
+            if (e.hp <= 0) { 
+                kills++; // 撃破でポイント獲得
+                // 敵を倒したらkillsを1増やす（ショップの通貨になる）
+                enemies.splice(i, 1); 
+                // enemies配列からこの敵を削除する
+                continue; 
+                // 次の敵の処理へスキップする（削除した後のアクセスを避ける）
+            }
+            if (Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) player.hp -= 0.05;
+            // プレイヤーと敵が重なっていたら毎フレーム0.05ずつHPを減らす（接触ダメージ）
+        }
+
+        // ミサイル
+        for (let i = missiles.length - 1; i >= 0; i--) {
+            // ミサイルも後ろから順番に処理する
+            const m = missiles[i];
+            // iのミサイルを変数mに代入する
+            m.x += m.vx; m.y += m.vy;
+            // 毎フレーム速度分だけミサイルを移動させる
+            const distToSword = Math.hypot(m.x - swX, m.y - swY);
+            // ミサイルと剣の先端の距離を計算する
+            if (distToSword < 30 || Math.hypot(m.x - ARENA_RADIUS, m.y - ARENA_RADIUS) + m.radius > ARENA_RADIUS) {
+                // 剣に30px以内に近づくか、アリーナ外に出たら
+                missiles.splice(i, 1); continue;
+                // ミサイルを削除して次へ（剣でミサイルを弾く・アリーナ外で消える）
+            }
+            if (Math.hypot(player.x - m.x, player.y - m.y) < player.radius + m.radius) {
+                // ミサイルがプレイヤーに当たったら
+                player.hp -= 2.0; missiles.splice(i, 1);
+                // HPを2減らしミサイルを削除する
+            }
+        }
+        if (player.hp <= 0) gameOver();
+        // HPが0以下になったらgameOver()を呼んでゲームオーバーにする
+    }
+
+    // ===== 毎フレーム呼ばれる描画関数 =====
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // キャンバス全体をクリアして前のフレームの絵を消す
+
+        ctx.beginPath();
+        // 新しいパス（図形の輪郭）の描画を開始する
+        ctx.arc(ARENA_RADIUS, ARENA_RADIUS, ARENA_RADIUS - 2, 0, Math.PI * 2);
+        // アリーナ境界線の円のパスを作る（中心(250,250)、半径248の円）
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.stroke();
+        // グレーで線幅2の輪郭線を描画する
+
+        enemies.forEach(e => {
+            // enemies配列の全敵を1体ずつ描画する
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+            // 敵の位置に半径e.radiusの円のパスを作る
+            ctx.fillStyle = e.color;
+            // 塗りつぶし色を敵の色にする
+            ctx.shadowBlur = 10; ctx.shadowColor = e.color;
+            // 敵の色でグロー効果を設定する
+            ctx.fill();
+            // 円を塗りつぶす
+            ctx.shadowBlur = 0;
+            // 次の描画に影響しないようグロー効果をリセットする
+            const barW = e.radius * 2;
+            // HPバーの幅を敵の直径と同じにする
+            ctx.fillStyle = '#333';
+            // HPバーの背景（残HPなし部分）をグレーにする
+            ctx.fillRect(e.x - e.radius, e.y - e.radius - 8, barW, 4);
+            // 敵の頭上に幅barW・高さ4pxの背景HPバーを描く
+            ctx.fillStyle = e.color;
+            // HPバーの前景（残HP部分）を敵の色にする
+            ctx.fillRect(e.x - e.radius, e.y - e.radius - 8, barW * (e.hp / e.maxHp), 4);
+            // 現在HPの割合（hp/maxHp）に応じた長さで前景HPバーを描く
+        });
+
+        missiles.forEach(m => {
+            // missiles配列の全ミサイルを1発ずつ描画する
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
+            // ミサイルの位置に半径4の円を描く
+            ctx.fillStyle = m.color;
+            // ミサイルの色で塗りつぶす
+            ctx.fill();
+            // ミサイルを描画する
+        });
+
+        // 剣
+        ctx.save();
+        // 現在の描画設定（座標変換など）を保存する
+        ctx.translate(player.x, player.y);
+        // 描画の原点をプレイヤーの位置に移動する（剣をプレイヤー中心に回転させるため）
+        ctx.rotate(player.swordAngle);
+        // 現在の剣の角度分だけ座標系を回転させる
+        ctx.beginPath();
+        ctx.moveTo(10, -player.swordWidth/2);
+        // 剣の根元の上端（プレイヤーから10px右、幅の半分上）に移動する
+        ctx.lineTo(player.swordLen, 0);
+        // 剣の先端（長さpx先の中央）まで線を引く
+        ctx.lineTo(10, player.swordWidth/2);
+        // 剣の根元の下端まで線を引く（三角形の剣を描く）
+        ctx.closePath();
+        // 最後の点と最初の点を結んで三角形を閉じる
+        ctx.fillStyle = '#00fbff';
+        // 剣の色をシアンに設定する
+        ctx.shadowBlur = 15; ctx.shadowColor = '#00fbff';
+        // 剣に強めのグロー効果をつける
+        ctx.fill();
+        // 剣を塗りつぶして描画する
+        ctx.restore();
+        // save()で保存した状態（translate/rotate前）に戻す
+
+        // プレイヤー
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        // プレイヤーの位置に半径10の円のパスを作る
+        ctx.fillStyle = player.color;
+        // プレイヤーの色（シアン）を設定する（※バグ修正でcolorを追加した行が活きる）
+        ctx.fill();
+        // プレイヤーを塗りつぶす
+        ctx.shadowBlur = 0;
+        // グロー効果をリセットする
+        ctx.fillStyle = '#333';
+        // HPバー背景色をグレーに設定する
+        ctx.fillRect(player.x - 15, player.y - 20, 30, 4);
+        // プレイヤーの頭上に幅30px・高さ4pxのHPバー背景を描く
+        ctx.fillStyle = '#00ff88';
+        // HPバーの前景色（残りHP部分）を緑に設定する
+        ctx.fillRect(player.x - 15, player.y - 20, 30 * (player.hp / player.maxHp), 4);
+        // 現在HPの割合に応じた幅でHP前景バーを描く（HPが減ると短くなる）
+    }
+
+    // ===== ゲームループ（毎フレーム繰り返される処理）=====
+    function gameLoop() {
+        if (gameState !== 'PLAYING') return;
+        // PLAYINGでなければループを止める。ショップ中やゲームオーバー時はここで終了する
+        update();
+        // ゲームの状態（位置・HP・衝突など）を更新する
+        draw();
+        // 更新後の状態を画面に描画する
+        animationId = requestAnimationFrame(gameLoop);
+        // ブラウザの次の描画タイミング（約60fps）で再びgameLoopを呼ぶ
+        // 戻り値のIDをanimationIdに保存することで、cancelAnimationFrame()で止められるようにする
+    }
+
+    draw();
+    // 最初のフレームだけ手動でdraw()を呼んでスタート画面の背景（アリーナ円）を描画する
+</script>
+</body>
+</html>
