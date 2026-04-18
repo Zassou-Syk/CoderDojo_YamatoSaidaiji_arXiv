@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>CoderDojo YamatoSaidaiji Archive</title>
+    <style>
+        body { background: #1a1a1a; color: #eee; font-family: sans-serif; text-align: center; margin: 0; padding: 50px; }
+        h1 { color: #00d4ff; }
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto; }
+        .game-card { background: #282828; border: 2px solid #444; border-radius: 15px; padding: 20px; transition: 0.3s; }
+        .game-card:hover { border-color: #00d4ff; }
+        .game-icon { width: 100px; height: 100px; border-radius: 50%; }
+        button { background: #00d4ff; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; margin-top: 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>CoderDojo YamatoSaidaiji Archive</h1>
+    <p>UnityやJSで作成したミニゲーム集です。</p>
+    <div class="game-grid">
+        <div class="game-card">
+            <img src="icon.png" class="game-icon" alt="Game Icon">
+            <h2>Circle Escape VIII</h2>
+            <p>40秒生存してショップで強化せよ！</p>
+            <button onclick="location.href='Circle_Escape_VIII/index.html'">PLAY GAME</button>
+        </div>
+    </div>
+</body>
+</html>
