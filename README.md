@@ -1,0 +1,2 @@
+# CoderDojo_YamatoSaidaiji_arXiv
+CoderDojo 大和西大寺のチャンピオンとしての活動の中で子どもたちと作ったり、自分が作ってみた作品を展示するリポジトリです
